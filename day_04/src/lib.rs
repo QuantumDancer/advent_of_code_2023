@@ -1,4 +1,4 @@
-use std::{num::ParseIntError, str::FromStr};
+use std::{collections::HashMap, num::ParseIntError, str::FromStr};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -21,15 +21,26 @@ pub struct Card {
 }
 
 impl Card {
-    fn points(&self) -> usize {
-        let correct_numbers = self
-            .numbers
+    fn new(id: usize, winning_numbers: Vec<usize>, numbers: Vec<usize>) -> Card {
+        Card {
+            id,
+            winning_numbers,
+            numbers,
+        }
+    }
+
+    fn amount_of_correct_numbers(&self) -> usize {
+        self.numbers
             .iter()
             .filter(|n| self.winning_numbers.contains(n))
             .collect::<Vec<_>>()
-            .len();
-        if correct_numbers > 0 {
-            2_usize.pow((correct_numbers - 1) as u32)
+            .len()
+    }
+
+    fn points(&self) -> usize {
+        let n_correct_numbers = self.amount_of_correct_numbers();
+        if n_correct_numbers > 0 {
+            2_usize.pow((n_correct_numbers - 1) as u32)
         } else {
             0
         }
@@ -72,11 +83,7 @@ impl FromStr for Card {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(Card {
-            id,
-            winning_numbers,
-            numbers,
-        })
+        Ok(Card::new(id, winning_numbers, numbers))
     }
 }
 
@@ -88,8 +95,22 @@ pub fn parse_input(input: &str) -> Vec<Card> {
         .collect()
 }
 
-pub fn process(cards: &[Card]) -> usize {
+pub fn process_part1(cards: &[Card]) -> usize {
     cards.iter().map(|c| c.points()).sum()
+}
+
+pub fn process_part2(cards: &[Card]) -> usize {
+    let mut amounts: HashMap<usize, usize> = HashMap::with_capacity(cards.len());
+    for i in 1..=cards.len() {
+        amounts.insert(i, 1);
+    }
+    for card in cards {
+        let this_card_amount = *amounts.get(&card.id).unwrap();
+        for i in card.id + 1..=card.id + card.amount_of_correct_numbers() {
+            *amounts.get_mut(&i).unwrap() += this_card_amount;
+        }
+    }
+    amounts.values().sum()
 }
 
 #[cfg(test)]
@@ -104,11 +125,11 @@ mod tests {
 
         assert_eq!(
             parsed_input[0],
-            Card {
-                id: 1,
-                winning_numbers: vec![41, 48, 83, 86, 17],
-                numbers: vec![83, 86, 6, 31, 17, 9, 48, 53]
-            }
+            Card::new(
+                1,
+                vec![41, 48, 83, 86, 17],
+                vec![83, 86, 6, 31, 17, 9, 48, 53]
+            )
         );
     }
 
@@ -117,7 +138,16 @@ mod tests {
         // setup_tracing();
         let input = fs::read_to_string("input_test.txt").expect("Could not read the file");
         let parsed_input = parse_input(&input);
-        let output = process(&parsed_input);
+        let output = process_part1(&parsed_input);
         assert_eq!(output, 13)
+    }
+
+    #[test]
+    fn test_process_part2() {
+        // setup_tracing();
+        let input = fs::read_to_string("input_test.txt").expect("Could not read the file");
+        let parsed_input = parse_input(&input);
+        let output = process_part2(&parsed_input);
+        assert_eq!(output, 30)
     }
 }
